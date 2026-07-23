@@ -1,0 +1,53 @@
+diff --git a/auth.py b/auth.py
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/auth.py
+@@ -0,0 +1,25 @@
++import sqlite3
++
++
++def login(username, password):
++    conn = sqlite3.connect("app.db")
++    cursor = conn.cursor()
++    query = f"SELECT * FROM users WHERE name = '{username}' AND password = '{password}'"
++    cursor.execute(query)
++    user = cursor.fetchone()
++    if user:
++        return generate_token(user[0])
++    return None
++
++
++def generate_token(user_id):
++    import secrets
++    return secrets.token_hex(16)
++
++
++def get_user_data(user_id):
++    conn = sqlite3.connect("app.db")
++    cursor = conn.cursor()
++    cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
++    return cursor.fetchone()
+diff --git a/utils.py b/utils.py
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/utils.py
+@@ -0,0 +1,18 @@
++import json
++
++
++def parse_config(path):
++    try:
++        with open(path) as f:
++            return json.load(f)
++    except Exception:
++        pass
++
++
++def divide(a, b):
++    return a / b
++
++
++def find_item(items, idx):
++    return items[idx]

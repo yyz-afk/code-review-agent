@@ -1,0 +1,72 @@
+diff --git a/payment.py b/payment.py
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/payment.py
+@@ -0,0 +1,45 @@
++import os
++import sqlite3
++import subprocess
++
++
++API_SECRET = "sk-abc123defaultsecret"
++
++
++def get_order(order_id):
++    conn = sqlite3.connect("app.db")
++    cursor = conn.cursor()
++    cursor.execute(f"SELECT * FROM orders WHERE id = {order_id}")
++    return cursor.fetchone()
++
++
++def list_user_orders(user_id):
++    conn = sqlite3.connect("app.db")
++    cursor = conn.cursor()
++    cursor.execute(f"SELECT id FROM orders WHERE user_id = {user_id}")
++    order_ids = cursor.fetchall()
++    items = []
++    for oid in order_ids:
++        cursor.execute(f"SELECT * FROM items WHERE order_id = {oid[0]}")
++        items.append(cursor.fetchone())
++    return items
++
++
++def process_refund(order, amount):
++    refund_amount = order["total"] - amount
++    send_notification(order["user"]["email"], refund_amount)
++    return refund_amount
++
++
++def send_notification(email, amount):
++    subject = "Refund Processed"
++    body = f"Refund of ${amount/100} processed"
++    try:
++        subprocess.call(f"echo '{body}' | mail {email}", shell=True)
++    except Exception:
++        pass
++    return True
++
++
++def divide_refund(total, parts):
++    return total / parts
+diff --git a/utils.py b/utils.py
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/utils.py
+@@ -0,0 +1,15 @@
++def parse_int(value, default=0):
++    try:
++        return int(value)
++    except Exception:
++        return default
++    finally:
++        return "invalid"
++
++
++def get_item(items, index):
++    return items[index]
++
++
++class CSVReader:
++    pass

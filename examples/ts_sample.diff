@@ -1,0 +1,36 @@
+diff --git a/auth.ts b/auth.ts
+new file mode 100644
+index 0000000..e69de29
+--- /dev/null
++++ b/auth.ts
+@@ -0,0 +1,30 @@
++import { Database } from './db';
++
++const ADMIN_PASSWORD = "admin123";
++
++export async function loginUser(username: string, password: string): Promise<any> {
++    const db = new Database();
++    const query = `SELECT * FROM users WHERE name = '${username}' AND password = '${password}'`;
++    const user = await db.query(query);
++    if (user) {
++        return user;
++    }
++    return null;
++}
++
++export function renderUserProfile(user: any): string {
++    return `<div class="profile" onclick="loadUser('${user.name}')">
++        <h1>${user.displayName}</h1>
++        <p>${user.bio}</p>
++    </div>`;
++}
++
++export async function fetchData(url: string): Promise<any> {
++    const response = await fetch(url);
++    const data = await response.json();
++    return data;
++}
++
++export function divide(a: number, b: number): number {
++    return a / b;
++}
