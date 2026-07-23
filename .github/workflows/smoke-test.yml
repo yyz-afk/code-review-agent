@@ -1,0 +1,52 @@
+name: Smoke Test
+
+# 真实 LLM 烟雾测试：每次 PR 跑一次完整 CLI 验证（mock 模式，无 Key）
+# 保护核心链路不被破坏
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    name: CLI Smoke Test (mock mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install tree-sitter tree-sitter-python tree-sitter-javascript \
+                      tree-sitter-typescript tree-sitter-java tree-sitter-go
+          pip install "litellm>=1.50,<1.60" langgraph pydantic pydantic-settings
+          pip install gitpython typer rich structlog httpx tenacity legacy-cgi
+          pip install -e . --no-deps
+
+      - name: CLI version
+        run: python -m cra.cli.main version
+
+      - name: CLI info (mock mode)
+        run: python -m cra.cli.main info
+
+      - name: CLI review (mock mode, text)
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -m cra.cli.main review --diff examples/sample.diff --format text --quiet
+          echo "Smoke test (text) passed"
+
+      - name: CLI review (mock mode, json)
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -m cra.cli.main review --diff examples/sample.diff --format json --output /tmp/report.json --quiet
+          test -f /tmp/report.json
+          echo "Smoke test (json) passed"

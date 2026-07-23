@@ -18,8 +18,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from cra.agents.critic import CriticAgent
 from cra.agents.llm import LlmClient
+from cra.agents.specialists.architecture import ArchitectureAgent
 from cra.agents.specialists.correctness import CorrectnessAgent
+from cra.agents.specialists.performance import PerformanceAgent
 from cra.agents.specialists.security import SecurityAgent
 from cra.context.ast_engine import get_ast_engine
 from cra.context.diff_parser import DiffParser
@@ -45,14 +48,22 @@ class ReviewConfig:
     max_findings_per_file: int = 5
     skip_noise_files: bool = True
     max_concurrent_files: int = 5  # v0.4：并行文件数上限（防限流）
-    # v0.5：启用的 Agent 列表（顺序执行，可并行）
+    # v0.6：4 个专项 Agent 全部启用
     enabled_agents: list[str] = field(
-        default_factory=lambda: ["correctness", "security"]
+        default_factory=lambda: [
+            "correctness",
+            "security",
+            "performance",
+            "architecture",
+        ]
     )
+    # v0.7：Critic 验证层
+    enable_critic: bool = True
+    critic_line_bucket_size: int = 5  # 去重时 ±N 行视为同一位置
 
 
 class ReviewOrchestrator:
-    """审查编排器（Phase 1）。"""
+    """审查编排器（Phase 1 v0.7）。"""
 
     def __init__(
         self,
@@ -64,11 +75,18 @@ class ReviewOrchestrator:
         self.diff_parser = DiffParser()
         self.ast_engine = get_ast_engine()
 
-        # Agent 注册表：name → instance
+        # Agent 注册表：name → instance（OCP：新增 Agent 只改这里）
         self._agents: dict[str, Any] = {
             "correctness": CorrectnessAgent(self.llm),
             "security": SecurityAgent(self.llm),
+            "performance": PerformanceAgent(self.llm),
+            "architecture": ArchitectureAgent(self.llm),
         }
+        # v0.7：独立 Critic Agent
+        self.critic = CriticAgent(
+            line_bucket_size=self.config.critic_line_bucket_size,
+            confidence_threshold=self.config.confidence_threshold,
+        )
 
     async def review_diff(self, diff_text: str) -> ReviewResult:
         """审查 diff 文本。"""
@@ -137,17 +155,26 @@ class ReviewOrchestrator:
                 if file_findings:
                     files_reviewed += 1
 
-        # Critic 层：去重 + 过滤
-        deduped = self._dedup_findings(raw_findings)
-        filtered = self._filter_by_confidence(deduped)
+        # Critic 层：去重 + 过滤（v0.7：使用独立 Critic Agent）
+        if self.config.enable_critic:
+            critic_result = self.critic.verify(raw_findings)
+            final_findings = critic_result.verified
+            critic_dropped = len(raw_findings) - len(final_findings)
+            if critic_dropped > 0:
+                logger.info(
+                    "Critic dropped %d/%d findings (dup/low-confidence)",
+                    critic_dropped, len(raw_findings),
+                )
+        else:
+            final_findings = raw_findings
 
         elapsed = time.perf_counter() - start
-        stats = self._build_stats(filtered, files_reviewed, elapsed, errors)
+        stats = self._build_stats(final_findings, files_reviewed, elapsed, errors)
 
         return ReviewResult(
             base_ref=base_ref,
             head_ref=head_ref,
-            findings=filtered,
+            findings=final_findings,
             stats=stats,
             errors=errors,
         )
