@@ -194,7 +194,6 @@ class AstEngine:
             return name_node.text.decode("utf-8", errors="replace")
 
         # 方式 2：遍历找 identifier
-        from tree_sitter import Node  # noqa: PLC0415
         for child in node.children:
             if child.type in ("identifier", "property_identifier", "type_identifier"):
                 return child.text.decode("utf-8", errors="replace")

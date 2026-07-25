@@ -16,7 +16,6 @@ from pathlib import Path
 from cra import __version__
 from cra.core.models import Category, ReviewResult, Severity
 
-
 # SARIF Level 映射（GitHub 识别的级别）
 _SARIF_LEVEL = {
     Severity.CRITICAL: "error",
@@ -85,6 +84,10 @@ def _build_sarif(result: ReviewResult) -> dict:
         if finding.description and finding.description != finding.title:
             message = f"{finding.title}\n\n{finding.description}"
 
+        # v0.8.1：SARIF 规范要求 uri 用正斜杠（Windows 兼容）
+        # 参考：https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html#_Toc34317681
+        normalized_uri = finding.file_path.replace("\\", "/")
+
         result_entry = {
             "ruleId": rule_id,
             "level": _severity_to_sarif_level(finding.severity),
@@ -93,7 +96,7 @@ def _build_sarif(result: ReviewResult) -> dict:
                 {
                     "physicalLocation": {
                         "artifactLocation": {
-                            "uri": finding.file_path,
+                            "uri": normalized_uri,
                             "uriBaseId": "%SRCROOT%",
                         },
                         "region": {

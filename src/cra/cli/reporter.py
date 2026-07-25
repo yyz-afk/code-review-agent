@@ -9,8 +9,6 @@
 
 from __future__ import annotations
 
-import json
-import sys
 from io import StringIO
 from pathlib import Path
 
@@ -51,7 +49,7 @@ def render_text(result: ReviewResult, file=None) -> str:
                 for line in f.description.splitlines()[:3]:
                     w(f"        {line}\n")
             if f.suggestion:
-                w(f"     🔧 Suggestion:\n")
+                w("     🔧 Suggestion:\n")
                 for line in str(f.suggestion).splitlines()[:5]:
                     w(f"        {line}\n")
             w("\n")
@@ -97,7 +95,7 @@ def render_markdown(result: ReviewResult) -> str:
         lines.append(f"- **Location**: `{f.file_path}:{f.start_line}-{f.end_line}`")
         lines.append(f"- **Agent**: `{f.agent}` (confidence: {f.confidence:.2f})")
         lines.append("")
-        lines.append(f"**Description**:")
+        lines.append("**Description**:")
         lines.append("")
         lines.append(f"> {f.description}")
         lines.append("")
@@ -109,7 +107,7 @@ def render_markdown(result: ReviewResult) -> str:
             lines.append("```")
             lines.append("")
         if f.evidence:
-            lines.append(f"<details><summary>Evidence</summary>")
+            lines.append("<details><summary>Evidence</summary>")
             lines.append("")
             lines.append(f"```\n{f.evidence}\n```")
             lines.append("")

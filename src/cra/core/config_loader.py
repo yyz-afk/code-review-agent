@@ -25,7 +25,10 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from cra.agents.orchestrator import ReviewConfig
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +63,12 @@ class ProjectConfig:
     def source_path(self) -> Path | None:
         return self._source
 
-    def apply_to_review_config(self, config) -> None:
-        """把项目配置应用到 ReviewConfig（仅覆盖已设置的字段）。"""
+    def apply_to_review_config(self, config: ReviewConfig) -> None:
+        """把项目配置应用到 ReviewConfig（仅覆盖已设置的字段）。
+
+        优先级规范：CLI 参数 > .cra.toml > 默认值
+        因此本方法只在 CLI 没显式设置时才覆盖（由调用方保证）。
+        """
         if self.enabled_agents is not None:
             config.enabled_agents = self.enabled_agents
         if self.confidence_threshold is not None:

@@ -105,7 +105,8 @@ def review(
     confidence: float = typer.Option(
         None,
         "--confidence",
-        help="置信度阈值（默认从配置读取）",
+        help="置信度阈值（0.0-1.0，默认从配置读取）",
+        min=0.0, max=1.0,  # v0.8.1：范围校验，typer 自动报错
     ),
     agents: str = typer.Option(
         None,
@@ -140,18 +141,22 @@ def review(
 
     project_cfg = load_project_config(Path.cwd())
     if project_cfg.is_loaded:
-        # 仅填充命令行未指定的字段
-        if enabled_agents is None and project_cfg.enabled_agents:
-            config.enabled_agents = project_cfg.enabled_agents
-        if confidence is None and project_cfg.confidence_threshold is not None:
-            config.confidence_threshold = project_cfg.confidence_threshold
-        if project_cfg.max_findings_per_file is not None:
-            config.max_findings_per_file = project_cfg.max_findings_per_file
+        # v0.8.1：CLI 优先，仅填充 CLI 未指定的字段
+        if enabled_agents is None:
+            project_cfg.apply_to_review_config(config)
+        else:
+            # agents 已被 CLI 指定，只覆盖其他字段
+            if project_cfg.confidence_threshold is not None and confidence is None:
+                config.confidence_threshold = project_cfg.confidence_threshold
+            if project_cfg.max_findings_per_file is not None:
+                config.max_findings_per_file = project_cfg.max_findings_per_file
         console.print(
             f"[dim]Loaded project config: {project_cfg.source_path}[/dim]"
         )
 
-    orchestrator = ReviewOrchestrator(config=config)
+    # v0.8.1：把 project_config 传给 orchestrator 让其生效
+    # （excluded_paths / custom_rules 在 orchestrator 中真正使用）
+    orchestrator = ReviewOrchestrator(config=config, project_config=project_cfg)
 
     async def run():
         if diff_file:

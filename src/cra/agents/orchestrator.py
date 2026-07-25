@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,16 +27,18 @@ from cra.agents.specialists.performance import PerformanceAgent
 from cra.agents.specialists.security import SecurityAgent
 from cra.context.ast_engine import get_ast_engine
 from cra.context.diff_parser import DiffParser
+from cra.core.config_loader import ProjectConfig
 from cra.core.models import (
     AgentContext,
+    Category,
     Finding,
     Hunk,
     ReviewResult,
     ReviewStats,
     Severity,
     SymbolInfo,
+    _is_noise_file,
 )
-from cra.core.models import _is_noise_file
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +72,12 @@ class ReviewOrchestrator:
         self,
         llm_client: LlmClient | None = None,
         config: ReviewConfig | None = None,
+        project_config: ProjectConfig | None = None,
     ) -> None:
         self.llm = llm_client or _get_default_llm()
         self.config = config or ReviewConfig()
+        # v0.8.1：项目级配置（excluded_paths / custom_rules 真正生效）
+        self.project_config = project_config or ProjectConfig()
         self.diff_parser = DiffParser()
         self.ast_engine = get_ast_engine()
 
@@ -111,6 +117,12 @@ class ReviewOrchestrator:
         task_files: list[str] = []  # 与 tasks 一一对应，便于错误归属
 
         for file_change in files:
+            # v0.8.1：项目级 excluded_paths（最优先，比 noise 过滤更早）
+            if self.project_config.matches_excluded(file_change.path):
+                logger.debug(
+                    "Skip excluded path (.cra.toml): %s", file_change.path
+                )
+                continue
             if self.config.skip_noise_files and _is_noise_file(file_change.path):
                 logger.debug("Skip noise file: %s", file_change.path)
                 continue
@@ -249,12 +261,81 @@ class ReviewOrchestrator:
             if isinstance(result, list):
                 all_findings.extend(result)
 
+        # v0.8.1：应用 .cra.toml 中的 custom_rules（正则规则，所有模式都生效）
+        if self.project_config.custom_rules:
+            custom_findings = self._run_custom_rules(
+                file_path, hunks, self.project_config.custom_rules
+            )
+            all_findings.extend(custom_findings)
+
         # 按文件截断
         if len(all_findings) > self.config.max_findings_per_file:
             all_findings = sorted(all_findings, key=lambda f: f.severity.rank)
             all_findings = all_findings[: self.config.max_findings_per_file]
 
         return all_findings
+
+    def _run_custom_rules(
+        self,
+        file_path: str,
+        hunks: list[Hunk],
+        rules: list[dict],
+    ) -> list[Finding]:
+        """应用 .cra.toml 中定义的自定义正则规则。
+
+        规则结构：{id, severity, pattern, message}
+        - 在所有模式下都生效（不依赖 LLM）
+        - 命中后产生 confidence=0.7 的 finding
+        - 失败的正则编译会被跳过（不影响其他规则）
+        """
+        findings: list[Finding] = []
+
+        # 预编译所有正则（性能：避免每行重新编译）
+        compiled: list[tuple[re.Pattern, dict]] = []
+        for rule in rules:
+            pattern_str = rule.get("pattern")
+            if not pattern_str:
+                continue
+            try:
+                regex = re.compile(pattern_str)
+            except re.error as e:
+                logger.warning(
+                    "Custom rule %s has invalid regex %r: %s",
+                    rule.get("id", "?"), pattern_str, e,
+                )
+                continue
+            compiled.append((regex, rule))
+
+        if not compiled:
+            return findings
+
+        for hunk in hunks:
+            numbered_lines = _parse_hunk_to_lines(hunk)
+            for regex, rule in compiled:
+                sev_str = str(rule.get("severity", "info")).lower()
+                try:
+                    severity = Severity(sev_str)
+                except ValueError:
+                    severity = Severity.INFO
+                rule_id = rule.get("id", "custom-rule")
+                message = rule.get("message", "自定义规则匹配")
+                title = f"[{rule_id}] {message}"
+
+                for line_no, line in numbered_lines:
+                    if regex.search(line):
+                        findings.append(Finding(
+                            agent="custom",
+                            severity=severity,
+                            category=Category.MAINTAINABILITY,
+                            file_path=file_path,
+                            start_line=line_no,
+                            end_line=line_no,
+                            title=title[:200],
+                            description=message,
+                            evidence=f"L{line_no}: {line.strip()}",
+                            confidence=0.7,
+                        ))
+        return findings
 
     def _extract_symbols_from_hunk(
         self,
@@ -282,30 +363,6 @@ class ReviewOrchestrator:
                 "end_line": sym.end_line + offset,
             }))
         return fixed
-
-    def _dedup_findings(self, findings: list[Finding]) -> list[Finding]:
-        """去重：相同 file + 相近行号 + 相同 title 视为重复。
-
-        保留置信度最高的那条。
-        """
-        if not findings:
-            return []
-
-        # 按 (file, title, 近似行号) 聚类
-        groups: dict[tuple, Finding] = {}
-        for f in findings:
-            # 行号 ±3 视为同一位置
-            line_bucket = f.start_line // 3
-            key = (f.file_path, f.title.strip().lower(), line_bucket)
-            existing = groups.get(key)
-            if existing is None or f.confidence > existing.confidence:
-                groups[key] = f
-        return list(groups.values())
-
-    def _filter_by_confidence(self, findings: list[Finding]) -> list[Finding]:
-        """按置信度阈值过滤。"""
-        threshold = self.config.confidence_threshold
-        return [f for f in findings if f.confidence >= threshold]
 
     def _build_stats(
         self,

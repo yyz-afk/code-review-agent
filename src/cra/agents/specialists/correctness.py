@@ -155,7 +155,7 @@ class CorrectnessAgent:
 
     name = "correctness"
 
-    def __init__(self, llm_client: "LlmClient") -> None:
+    def __init__(self, llm_client: LlmClient) -> None:
         self.llm = llm_client
 
     async def review(self, ctx: AgentContext) -> list[Finding]:

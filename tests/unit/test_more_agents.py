@@ -7,10 +7,14 @@ import pytest
 from cra.agents.llm import LlmClient
 from cra.agents.specialists.architecture import (
     ArchitectureAgent,
+)
+from cra.agents.specialists.architecture import (
     _run_mock_rules as arch_mock,
 )
 from cra.agents.specialists.performance import (
     PerformanceAgent,
+)
+from cra.agents.specialists.performance import (
     _run_mock_rules as perf_mock,
 )
 from cra.core.models import AgentContext

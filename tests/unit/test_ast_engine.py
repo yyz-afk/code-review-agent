@@ -6,7 +6,6 @@ import pytest
 
 from cra.context.ast_engine import AstEngine, get_ast_engine
 
-
 # 测试样本：含函数、类、方法、嵌套
 PY_SAMPLE = '''\
 """模块文档。"""

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import pytest
-
 from cra.context.diff_parser import DiffParser, parse_git_diff
 from cra.core.models import ChangeStatus
-
 from tests.fixtures.sample_diffs import (
     DELETE_FILE_DIFF,
     MULTI_FILE_DIFF,

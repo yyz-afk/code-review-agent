@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-import pytest
-
-from cra.agents.critic import CriticAgent, CriticResult
+from cra.agents.critic import CriticAgent
 from cra.core.models import Category, Finding, Severity
 
 

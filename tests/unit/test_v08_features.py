@@ -10,9 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
-from cra.cli.sarif import render_sarif, _severity_to_sarif_level, _line_hash
+from cra.cli.sarif import _line_hash, _severity_to_sarif_level, render_sarif
 from cra.core.config_loader import (
     ProjectConfig,
     find_config_file,
@@ -25,7 +23,6 @@ from cra.core.models import (
     ReviewStats,
     Severity,
 )
-
 
 # ============================================================
 # SARIF 测试

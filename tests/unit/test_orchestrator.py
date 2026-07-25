@@ -18,7 +18,6 @@ from cra.core.models import (
     Severity,
 )
 
-
 # ============================================================
 # _parse_hunk_to_lines：hunk → 原始行号映射（核心修复点）
 # ============================================================
@@ -97,7 +96,7 @@ class TestParseHunkToLines:
 
 
 # ============================================================
-# _dedup_findings：Critic 去重逻辑
+# Fixture 与工具：供后续测试使用
 # ============================================================
 
 
@@ -134,86 +133,8 @@ def _make_finding(
     )
 
 
-class TestDedupFindings:
-    """Critic 去重逻辑测试。"""
-
-    def test_no_dedup_for_different_files(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        f1 = _make_finding(file="a.py", line=10)
-        f2 = _make_finding(file="b.py", line=10)
-        result = orchestrator_no_llm._dedup_findings([f1, f2])
-        assert len(result) == 2
-
-    def test_dedup_same_file_same_line_same_title(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        f1 = _make_finding(line=10, confidence=0.7)
-        f2 = _make_finding(line=10, confidence=0.9)
-        result = orchestrator_no_llm._dedup_findings([f1, f2])
-        assert len(result) == 1
-        # 应保留置信度更高的
-        assert result[0].confidence == 0.9
-
-    def test_dedup_nearby_lines(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        """L10 和 L11 在 ±3 范围内，应去重。"""
-        f1 = _make_finding(line=10, confidence=0.7)
-        f2 = _make_finding(line=11, confidence=0.8)
-        result = orchestrator_no_llm._dedup_findings([f1, f2])
-        assert len(result) == 1
-
-    def test_keep_far_apart_findings(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        """L10 和 L20 应保留两条。"""
-        f1 = _make_finding(line=10, title="issue A")
-        f2 = _make_finding(line=20, title="issue A")
-        result = orchestrator_no_llm._dedup_findings([f1, f2])
-        assert len(result) == 2
-
-    def test_different_title_kept(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        """同位置不同问题应保留。"""
-        f1 = _make_finding(line=10, title="SQL injection")
-        f2 = _make_finding(line=10, title="resource leak")
-        result = orchestrator_no_llm._dedup_findings([f1, f2])
-        assert len(result) == 2
-
-    def test_empty_input(self, orchestrator_no_llm: ReviewOrchestrator) -> None:
-        assert orchestrator_no_llm._dedup_findings([]) == []
-
-    def test_title_case_insensitive(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        """title 大小写不敏感。"""
-        f1 = _make_finding(line=10, title="SQL Injection")
-        f2 = _make_finding(line=10, title="sql injection")
-        result = orchestrator_no_llm._dedup_findings([f1, f2])
-        assert len(result) == 1
-
-
-class TestConfidenceFilter:
-    """置信度过滤。"""
-
-    def test_filters_below_threshold(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        f1 = _make_finding(confidence=0.3)
-        f2 = _make_finding(confidence=0.6)
-        result = orchestrator_no_llm._filter_by_confidence([f1, f2])
-        # 默认阈值 0.5
-        assert len(result) == 1
-        assert result[0].confidence == 0.6
-
-    def test_keeps_at_threshold(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
-        f = _make_finding(confidence=0.5)
-        result = orchestrator_no_llm._filter_by_confidence([f])
-        assert len(result) == 1
+# 注：v0.8.1 起，_dedup_findings 和 _filter_by_confidence 已从 Orchestrator 删除
+# （去重/过滤由独立 CriticAgent 负责，测试见 test_critic.py）
 
 
 # ============================================================
