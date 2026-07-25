@@ -1,103 +1,198 @@
 # Code Review Agent
 
-> 基于 LLM Agent 的企业级 AI 代码审查系统
+> 基于 LLM 多 Agent 的 AI 代码审查工具。一行命令审查 diff，一行配置接入 GitHub Action。
 
-[![Status](https://img.shields.io/badge/status-design-orange)]()
+[![CI](https://github.com/xuxiaxuan/code-review-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/xuxiaxuan/code-review-agent/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11+-blue)]()
-[![License](https://img.shields.io/badge/license-TBD-lightgrey)]()
+[![Status](https://img.shields.io/badge/status-v0.8-green)]()
 
 ## 项目简介
 
-Code Review Agent 是一个基于多 Agent 协作的 AI 代码审查系统，定位为**企业内部研发平台**。通过自动分析 GitHub/GitLab 的 Pull Request / Merge Request，输出高质量、低噪音的代码审查意见，帮助研发团队：
+Code Review Agent 是一个基于多 Agent 协作的 AI 代码审查工具，通过分析 Git diff 自动发现代码缺陷。支持 GitHub Action 一键接入、CLI 本地运行、项目级配置。
 
-- **缩短 PR 等待时间**：7×24 小时即时响应，无需人工排队
-- **提升审查质量**：多专家 Agent 并行 + 验证层过滤，误报率 < 10%
-- **沉淀审查知识**：从团队历史反馈中持续学习，适配内部规范
-- **覆盖深度问题**：基于代码图与上下文引擎，发现跨文件、架构级缺陷
+**核心能力：**
 
-## 核心特性
+- 🎯 **精确率优先**：多 Agent 并行 + 独立 Critic 验证层，误报率 < 10%
+- 🧠 **四类专家 Agent**：正确性 / 安全 / 性能 / 架构
+- 🌍 **多语言 AST**：Python / JavaScript / TypeScript / Java / Go（tree-sitter）
+- 🔌 **多模型路由**：DeepSeek / Claude / GLM / OpenAI / Ollama（LiteLLM）
+- 📤 **SARIF 标准**：原生接入 GitHub Code Scanning
+- ⚙️ **项目级配置**：`.cra.toml` 统一团队审查策略
 
-- 🎯 **精确率优先**：只报高置信度问题，宁可漏报也不误报
-- 🧠 **多 Agent 协作**：安全/性能/正确性/架构等专家 Agent 各司其职
-- 🔍 **深度上下文**：Tree-sitter AST + 代码图 + 按需检索
-- 🌐 **双平台支持**：GitHub + GitLab 统一抽象，体验一致
-- 💸 **成本可控**：多模型路由，小模型预筛 + 大模型深审
-- 🔒 **私有化友好**：支持本地 LLM（Ollama/vLLM），数据不出内网
-- 🧩 **可扩展**：Agent、工具、规则均插件化设计
+## 快速开始
+
+### 1. 安装
+
+```bash
+pip install "git+https://github.com/xuxiaxuan/code-review-agent.git@main"
+```
+
+### 2. 配置 LLM Key
+
+```bash
+# 以 DeepSeek 为例（性价比最高）
+export DEEPSEEK_API_KEY="sk-..."
+```
+
+### 3. 审查 diff
+
+```bash
+# 审查最近一次提交
+code-review review --base HEAD~1
+
+# 审查分支差异
+code-review review --base main --head feature/your-branch
+```
+
+### 4. GitHub Action 一键接入
+
+在目标仓库 `.github/workflows/code-review.yml`：
+
+```yaml
+name: AI Code Review
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: xuxiaxuan/code-review-agent@main
+        with:
+          api_key: ${{ secrets.CRA_API_KEY }}
+```
+
+详细接入步骤见 **[接入指南](docs/INTEGRATION.md)**。
+
+## Agent 能力矩阵
+
+| Agent | 检测内容 | 示例 |
+|---|---|---|
+| **correctness** | 逻辑错误、资源泄漏、异常吞没、边界缺失 | 数据库连接未关闭、`except: pass`、除零、索引越界 |
+| **security** | SQL 注入、命令注入、硬编码密钥、不安全反序列化 | `cursor.execute(f"...{user}")`、`shell=True`、`pickle.loads` |
+| **performance** | N+1 查询、低效循环、不必要的数据拷贝 | 循环内执行 SQL、`O(n²)` 嵌套 |
+| **architecture** | SRP/DRY/KISS/YAGNI 违反、God Object、过度封装 | 50+ 行函数、纯透传函数、重复抽象 |
+
+所有 Agent 并行执行，结果交由独立 **CriticAgent** 去重 + 置信度过滤。
+
+## 配置
+
+### CLI 参数
+
+```
+code-review review --help
+
+Options:
+  -b, --base TEXT         Base ref（分支/commit/tag）
+  --head TEXT             Head ref，默认 HEAD
+  -r, --repo PATH         Git 仓库路径，默认当前目录
+      --diff PATH         从 diff 文件读取（替代 git diff）
+  -f, --format [text|markdown|json|sarif]
+                          输出格式，默认 text
+  -o, --output PATH       输出到文件
+      --confidence FLOAT  置信度阈值（默认 0.5）
+      --agents TEXT       启用 Agent（逗号分隔）
+  -q, --quiet             静默模式
+```
+
+### 项目级配置 `.cra.toml`
+
+```toml
+[review]
+enabled_agents = ["correctness", "security", "performance", "architecture"]
+confidence_threshold = 0.5
+max_findings_per_file = 5
+
+[review.excluded_paths]
+patterns = ["vendor/**", "**/*.generated.*", "tests/fixtures/**"]
+
+[llm]
+model = "deepseek/deepseek-chat"
+```
+
+完整字段说明见 **[接入指南 - 项目级配置](docs/INTEGRATION.md#4-项目级配置-cratoml)**。
+
+## 支持的 LLM Provider
+
+| Provider | 模型示例 | 环境变量 |
+|---|---|---|
+| DeepSeek（推荐） | `deepseek/deepseek-chat` | `DEEPSEEK_API_KEY` |
+| Anthropic Claude | `anthropic/claude-3-5-sonnet-20241022` | `ANTHROPIC_API_KEY` |
+| 智谱 GLM | `anthropic/glm-5.2` | `ANTHROPIC_API_KEY` + `ANTHROPIC_API_BASE` |
+| OpenAI | `openai/gpt-4o-mini` | `OPENAI_API_KEY` |
+| Ollama（本地） | `ollama/llama3` | 无需 Key |
+
+## 输出格式
+
+| 格式 | 用途 | 命令 |
+|---|---|---|
+| `text` | 控制台彩色输出（默认） | `--format text` |
+| `markdown` | PR 评论 / 文档 | `--format markdown -o review.md` |
+| `json` | 程序化处理 | `--format json -o review.json` |
+| `sarif` | **GitHub Code Scanning** | `--format sarif -o cra-results.sarif` |
 
 ## 技术栈
 
 | 维度 | 选型 |
 |---|---|
 | 语言 / 运行时 | Python 3.11+ |
-| Web 框架 | FastAPI + Uvicorn |
-| Agent 编排 | LangGraph |
+| CLI | typer + rich |
+| Agent 编排 | asyncio.gather + Semaphore（并行） |
 | 多模型调用 | LiteLLM |
-| 代码解析 | tree-sitter |
-| 静态分析 | Semgrep |
-| Git 操作 | GitPython / pygit2 |
-| 异步队列 | Celery + Redis |
-| 向量库 | Qdrant |
-| 持久化 | PostgreSQL + SQLAlchemy + Alembic |
-| 沙箱 | Docker SDK for Python |
-| 部署 | Docker Compose → Kubernetes |
+| 代码解析 | tree-sitter（5 语言） |
+| LLM 重试 | tenacity（指数退避） |
+| 数据模型 | pydantic v2 |
 
 ## 文档导航
 
-| 文档 | 内容 | 适用读者 |
-|---|---|---|
-| [系统设计](docs/SYSTEM_DESIGN.md) | 总体架构、模块划分、端到端流程、关键技术决策 | 架构师、后端开发 |
-| [数据模型与 API](docs/DATA_AND_API.md) | ER 设计、Schema 定义、REST API 规范 | 后端开发、前端开发 |
-| [Prompt 与 Agent 设计](docs/PROMPT_DESIGN.md) | Agent 角色定义、System Prompt、工具集、输出 Schema | AI 工程师、Prompt 工程师 |
-| [安全与部署](docs/SECURITY_AND_DEPLOYMENT.md) | 权限模型、密钥管理、沙箱隔离、部署架构、监控 | 运维、安全工程师 |
-| [实施路线](docs/IMPLEMENTATION_ROADMAP.md) | 分阶段计划、交付物、风险应对 | 项目经理、技术负责人 |
+| 文档 | 内容 |
+|---|---|
+| **[接入指南](docs/INTEGRATION.md)** | CLI / GitHub Action / GitLab CI 用法、配置、FAQ |
+| [系统设计](docs/SYSTEM_DESIGN.md) | 总体架构、模块划分、端到端流程 |
+| [数据模型与 API](docs/DATA_AND_API.md) | 数据 Schema、REST API 规范 |
+| [Prompt 与 Agent 设计](docs/PROMPT_DESIGN.md) | Agent 角色定义、System Prompt |
+| [安全与部署](docs/SECURITY_AND_DEPLOYMENT.md) | 权限模型、密钥管理、部署架构 |
+| [实施路线](docs/IMPLEMENTATION_ROADMAP.md) | 分阶段计划 |
 
-## 快速开始
-
-> ⚠️ 项目处于设计阶段，以下为占位说明，将在 MVP 阶段补全。
+## 开发
 
 ```bash
-# 克隆仓库
-git clone <repo-url> code-review-agent
+# 克隆 + 开发模式安装
+git clone https://github.com/xuxiaxuan/code-review-agent.git
 cd code-review-agent
+pip install -e ".[dev]"
 
-# 安装依赖（待实现）
-poetry install
+# 运行测试
+pytest tests/ -v --cov=cra
 
-# 配置环境变量（待实现）
-cp .env.example .env
-
-# 启动服务（待实现）
-docker compose up -d
+# 代码检查
+ruff check src/ tests/
+mypy src/cra/
 ```
 
 ## 项目状态
 
-当前阶段：**设计阶段**（Design Phase）
-
-已完成：
-- ✅ 行业调研（主流产品、开源方案、技术路线）
-- ✅ 技术选型（技术栈锁定）
-- ✅ 系统设计文档
-
-进行中：
-- 🚧 详细设计评审
-
-后续规划：
-- 📋 Phase 1：MVP 原型（单 Agent + CLI + diff 解析）
-- 📋 Phase 2：多 Agent + 双平台接入
-- 📋 Phase 3：规模化与持续优化
+- ✅ v0.1-v0.4：MVP（单 Agent + 多语言 AST + Hunk 行号映射）
+- ✅ v0.5：SecurityAgent + LLM 重试 + 并行文件审查
+- ✅ v0.6：PerformanceAgent + ArchitectureAgent
+- ✅ v0.7：独立 CriticAgent + GitHub CI
+- ✅ v0.8：SARIF 输出 + GitHub Action + `.cra.toml` 项目级配置
+- 🚧 v0.9：GitLab MR 支持 + PR inline 评论
+- 📋 v1.0：Web Dashboard + 团队反馈学习
 
 ## 设计原则
 
 | 原则 | 在本项目中的体现 |
 |---|---|
-| **KISS** | 单 Agent 能解决的不上多 Agent；自研轻量组件优先于引入重型框架 |
-| **YAGNI** | 仅实现当前阶段明确所需；拒绝为"未来可能用到"预留复杂接口 |
-| **DRY** | SCM Provider、LLM Provider、工具集统一抽象，消除重复 |
-| **SRP** | 每个 Agent 只负责一类问题；每个模块单一职责 |
-| **OCP** | Agent、工具、规则通过注册机制扩展，不修改核心代码 |
-| **DIP** | 核心逻辑依赖抽象接口（ScmProvider / LlmProvider / Tool），不依赖具体实现 |
+| **KISS** | 单文件能解决的不上 LangGraph；asyncio 原生编排 |
+| **YAGNI** | 不为"未来可能用到"预留复杂接口；Mock 模式让没 Key 也能跑 |
+| **DRY** | `specialists/base.py` 抽象 Agent 公共逻辑；统一 `render()` 入口 |
+| **SRP** | 每个 Agent 只负责一类问题；CriticAgent 独立负责验证 |
+| **OCP** | 通过 `AGENT_REGISTRY` 注册新 Agent，不修改 Orchestrator |
+| **DIP** | 核心逻辑依赖 `ReviewConfig` 抽象，不绑定具体 LLM Provider |
 
 ## License
 

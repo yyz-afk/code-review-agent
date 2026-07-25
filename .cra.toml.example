@@ -1,0 +1,46 @@
+# Code Review Agent 配置示例
+# 复制到你的项目根目录并重命名为 .cra.toml
+# 配置文件优先级：命令行参数 > .cra.toml > 环境变量 > 默认值
+
+[review]
+# 启用的 Agent（顺序不影响结果，所有 Agent 都会并行执行）
+# 可选值：correctness, security, performance, architecture
+enabled_agents = ["correctness", "security", "performance", "architecture"]
+
+# 置信度阈值（0.0-1.0），低于此值的 finding 会被丢弃
+confidence_threshold = 0.5
+
+# 单文件最多保留的 finding 数（按严重度排序后截断）
+max_findings_per_file = 5
+
+# 排除审查的文件路径（支持 glob）
+[review.excluded_paths]
+patterns = [
+    "vendor/**",
+    "**/*.generated.*",
+    "**/*.pb.go",
+    "tests/fixtures/**",
+    "**/__pycache__/**",
+]
+
+# 自定义规则（Phase 2 将集成到 LLM 审查）
+# 当前版本会被记录但不会自动应用
+[[review.custom_rules]]
+id = "no-print-in-prod"
+severity = "low"
+pattern = "^\\s*print\\("
+message = "生产代码不应包含 print 语句"
+
+[[review.custom_rules]]
+id = "no-todo"
+severity = "info"
+pattern = "(?i)TODO|FIXME|XXX"
+message = "发现 TODO/FIXME 注释，建议跟进或转为 Issue"
+
+[llm]
+# 模型配置
+# 推荐：deepseek/deepseek-chat（成本低）/ anthropic/glm-5.2（智谱兼容）/ anthropic/claude-3-5-sonnet-20241022
+model = "deepseek/deepseek-chat"
+
+# 可选：预定义的 LLM profile（用于多团队配置）
+# profile = "cost_optimized"  # 或 "balanced" / "powerful"

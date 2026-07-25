@@ -1,0 +1,117 @@
+name: "AI Code Review Agent"
+description: "基于多 Agent 的 AI 代码审查，支持 Python/JS/TS/Java/Go。输出 SARIF 报告并上传到 GitHub Code Scanning。"
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+inputs:
+  base:
+    description: "Base ref（分支/commit），默认为 PR 的 base 分支"
+    required: false
+    default: ""
+  head:
+    description: "Head ref，默认为 PR 的 head"
+    required: false
+    default: "HEAD"
+  api_key:
+    description: "LLM API Key（如 DEEPSEEK_API_KEY / ANTHROPIC_API_KEY）"
+    required: true
+  api_base:
+    description: "自定义 API Base URL（用于智谱/兼容接口）"
+    required: false
+    default: ""
+  model:
+    description: "模型名（如 anthropic/glm-5.2 / deepseek/deepseek-chat）"
+    required: false
+    default: "deepseek/deepseek-chat"
+  agents:
+    description: "启用的 Agent（逗号分隔：correctness,security,performance,architecture）"
+    required: false
+    default: "correctness,security,performance,architecture"
+  fail_on_high:
+    description: "存在 high/critical 时让 Action 失败（阻断 PR 合并）"
+    required: false
+    default: "false"
+  upload_sarif:
+    description: "是否上传 SARIF 到 GitHub Code Scanning"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 完整历史，便于 diff
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install Code Review Agent
+      shell: bash
+      run: |
+        pip install --quiet \
+          "git+https://github.com/xuxiaxuan/code-review-agent.git@main" || \
+        (
+          echo "Falling back to pip install from PyPI (if published)"
+          pip install code-review-agent
+        )
+
+    - name: Determine base ref
+      id: refs
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.base }}" ]; then
+          # PR 事件：自动获取 base
+          if [ -n "$GITHUB_BASE_REF" ]; then
+            echo "base=origin/$GITHUB_BASE_REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=HEAD~1" >> "$GITHUB_OUTPUT"
+          fi
+        else
+          echo "base=${{ inputs.base }}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Run Code Review
+      id: review
+      shell: bash
+      env:
+        PYTHONUTF8: "1"
+        DEEPSEEK_API_KEY: ${{ inputs.api_key }}
+        ANTHROPIC_API_KEY: ${{ inputs.api_key }}
+        ANTHROPIC_API_BASE: ${{ inputs.api_base }}
+        CRA_DEFAULT_MODEL: ${{ inputs.model }}
+      run: |
+        set +e  # 不立刻退出，记录 exit code
+        code-review review \
+          --base "${{ steps.refs.outputs.base }}" \
+          --head ${{ inputs.head }} \
+          --agents ${{ inputs.agents }} \
+          --format sarif \
+          --output cra-results.sarif
+        echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: ${{ inputs.upload_sarif == 'true' && hashFiles('cra-results.sarif') != '' }}
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: cra-results.sarif
+        category: ai-code-review
+
+    - name: Upload SARIF artifact
+      if: ${{ hashFiles('cra-results.sarif') != '' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ai-code-review-sarif
+        path: cra-results.sarif
+
+    - name: Fail if high/critical issues found
+      if: ${{ inputs.fail_on_high == 'true' && steps.review.outputs.exit_code == 1 }}
+      shell: bash
+      run: |
+        echo "::error::Code Review Agent found critical/high issues"
+        exit 1

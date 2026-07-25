@@ -95,7 +95,7 @@ def review(
     fmt: str = typer.Option(
         "text",
         "--format", "-f",
-        help="输出格式：text / markdown / json",
+        help="输出格式：text / markdown / json / sarif",
     ),
     output: Path = typer.Option(
         None,
@@ -106,6 +106,11 @@ def review(
         None,
         "--confidence",
         help="置信度阈值（默认从配置读取）",
+    ),
+    agents: str = typer.Option(
+        None,
+        "--agents",
+        help="启用的 Agent（逗号分隔：correctness,security,performance,architecture）",
     ),
     quiet: bool = typer.Option(
         False, "--quiet", "-q",
@@ -120,10 +125,31 @@ def review(
         _print_banner()
 
     # 构建配置
+    enabled_agents: list[str] | None = None
+    if agents:
+        enabled_agents = [a.strip() for a in agents.split(",") if a.strip()]
+
     config = ReviewConfig(
         confidence_threshold=confidence or settings.confidence_threshold,
         max_findings_per_file=settings.max_findings_per_file,
+        enabled_agents=enabled_agents if enabled_agents else None,
     )
+
+    # 加载项目级 .cra.toml（命令行参数优先级最高，不被覆盖）
+    from cra.core.config_loader import load_project_config  # noqa: PLC0415
+
+    project_cfg = load_project_config(Path.cwd())
+    if project_cfg.is_loaded:
+        # 仅填充命令行未指定的字段
+        if enabled_agents is None and project_cfg.enabled_agents:
+            config.enabled_agents = project_cfg.enabled_agents
+        if confidence is None and project_cfg.confidence_threshold is not None:
+            config.confidence_threshold = project_cfg.confidence_threshold
+        if project_cfg.max_findings_per_file is not None:
+            config.max_findings_per_file = project_cfg.max_findings_per_file
+        console.print(
+            f"[dim]Loaded project config: {project_cfg.source_path}[/dim]"
+        )
 
     orchestrator = ReviewOrchestrator(config=config)
 

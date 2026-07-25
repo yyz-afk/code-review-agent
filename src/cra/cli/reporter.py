@@ -1,9 +1,10 @@
 """报告生成器。
 
-支持三种输出格式：
+支持四种输出格式：
 - text（默认）：人类可读的彩色控制台输出
 - markdown：Markdown 格式报告
 - json：结构化 JSON
+- sarif：SARIF v2.1.0（GitHub Code Scanning 标准）
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import sys
 from io import StringIO
 from pathlib import Path
 
+from cra.cli.sarif import render_sarif
 from cra.core.models import ReviewResult, Severity
 
 
@@ -134,6 +136,8 @@ def render(result: ReviewResult, fmt: str = "text") -> str:
     """统一渲染入口。"""
     if fmt == "json":
         return render_json(result)
+    if fmt == "sarif":
+        return render_sarif(result)
     if fmt == "markdown" or fmt == "md":
         return render_markdown(result)
     return render_text(result, StringIO())
