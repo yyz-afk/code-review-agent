@@ -296,7 +296,7 @@ class TestLoadProjectConfig:
     def test_parses_excluded_paths_dict_form(self, tmp_path: Path) -> None:
         self._write_config(
             tmp_path / ".cra.toml",
-            "[review.excluded_paths]\npatterns = [\"vendor/**\", \"**/*.gen.go\"]\n",
+            '[review.excluded_paths]\npatterns = ["vendor/**", "**/*.gen.go"]\n',
         )
         cfg = load_project_config(tmp_path)
         assert cfg.excluded_paths == ["vendor/**", "**/*.gen.go"]

@@ -29,7 +29,10 @@ class TestParseHunkToLines:
     def test_new_start_is_respected(self) -> None:
         """hunk.new_start 应该作为代码首行的原始行号。"""
         hunk = Hunk(
-            old_start=1, old_lines=2, new_start=10, new_lines=3,
+            old_start=1,
+            old_lines=2,
+            new_start=10,
+            new_lines=3,
             content="""\
 @@ -1,2 +10,3 @@
  ctx
@@ -46,7 +49,10 @@ class TestParseHunkToLines:
     def test_deleted_lines_do_not_advance_line_number(self) -> None:
         """删除行（-）不应该让新文件行号前进。"""
         hunk = Hunk(
-            old_start=10, old_lines=3, new_start=10, new_lines=2,
+            old_start=10,
+            old_lines=3,
+            new_start=10,
+            new_lines=2,
             content="""\
 @@ -10,3 +10,2 @@
  ctx
@@ -62,7 +68,10 @@ class TestParseHunkToLines:
     def test_empty_lines_are_preserved(self) -> None:
         """空行（无前缀）应该按上下文处理。"""
         hunk = Hunk(
-            old_start=1, old_lines=3, new_start=1, new_lines=3,
+            old_start=1,
+            old_lines=3,
+            new_start=1,
+            new_lines=3,
             content="""\
 @@ -1,3 +1,3 @@
  line1
@@ -76,7 +85,10 @@ class TestParseHunkToLines:
     def test_skip_hunk_header_and_file_headers(self) -> None:
         """@@/---/+++ 行应该被跳过。"""
         hunk = Hunk(
-            old_start=1, old_lines=1, new_start=1, new_lines=1,
+            old_start=1,
+            old_lines=1,
+            new_start=1,
+            new_lines=1,
             content="""\
 @@ -1,1 +1,1 @@
 -old
@@ -89,7 +101,10 @@ class TestParseHunkToLines:
 
     def test_empty_hunk_returns_empty_list(self) -> None:
         hunk = Hunk(
-            old_start=1, old_lines=0, new_start=1, new_lines=0,
+            old_start=1,
+            old_lines=0,
+            new_start=1,
+            new_lines=0,
             content="@@ -1,0 +1,0 @@",
         )
         assert _parse_hunk_to_lines(hunk) == []
@@ -159,9 +174,7 @@ class TestSymbolLineOffset:
         assert symbols[0].start_line == 10
         assert symbols[0].end_line == 11
 
-    def test_offset_zero_for_first_line(
-        self, orchestrator_no_llm: ReviewOrchestrator
-    ) -> None:
+    def test_offset_zero_for_first_line(self, orchestrator_no_llm: ReviewOrchestrator) -> None:
         """original_start=1 时，偏移为 0。"""
         code = "def func():\n    pass"
         symbols = orchestrator_no_llm._extract_symbols_from_hunk(

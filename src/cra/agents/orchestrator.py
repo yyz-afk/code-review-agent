@@ -99,16 +99,12 @@ class ReviewOrchestrator:
         files = self.diff_parser.parse_unified_diff(diff_text)
         return await self._review_files(files, base_ref="diff", head_ref="head")
 
-    async def review_git(
-        self, repo_path: Path, base: str, head: str
-    ) -> ReviewResult:
+    async def review_git(self, repo_path: Path, base: str, head: str) -> ReviewResult:
         """审查 Git 仓库中 base...head 的变更。"""
         diff = self.diff_parser.get_diff_from_git(repo_path, base, head)
         return await self._review_files(diff.files, base, head)
 
-    async def _review_files(
-        self, files: list, base_ref: str, head_ref: str
-    ) -> ReviewResult:
+    async def _review_files(self, files: list, base_ref: str, head_ref: str) -> ReviewResult:
         """审查文件列表（v0.4：并行处理多文件）。"""
         start = time.perf_counter()
 
@@ -119,9 +115,7 @@ class ReviewOrchestrator:
         for file_change in files:
             # v0.8.1：项目级 excluded_paths（最优先，比 noise 过滤更早）
             if self.project_config.matches_excluded(file_change.path):
-                logger.debug(
-                    "Skip excluded path (.cra.toml): %s", file_change.path
-                )
+                logger.debug("Skip excluded path (.cra.toml): %s", file_change.path)
                 continue
             if self.config.skip_noise_files and _is_noise_file(file_change.path):
                 logger.debug("Skip noise file: %s", file_change.path)
@@ -130,17 +124,15 @@ class ReviewOrchestrator:
                 continue
             language = self.ast_engine.get_language(file_change.path)
             if language is None:
-                logger.debug(
-                    "Skip unsupported language file: %s", file_change.path
-                )
+                logger.debug("Skip unsupported language file: %s", file_change.path)
                 continue
 
             # 用 lambda 捕获循环变量需要默认参数
-            tasks.append(asyncio.create_task(
-                self._safe_review_single_file(
-                    file_change.path, file_change.hunks, language
+            tasks.append(
+                asyncio.create_task(
+                    self._safe_review_single_file(file_change.path, file_change.hunks, language)
                 )
-            ))
+            )
             task_files.append(file_change.path)
 
         # 并行执行（单 Agent 内的文件级并行）
@@ -156,7 +148,8 @@ class ReviewOrchestrator:
         errors: list[str] = []
         files_reviewed = 0
 
-        for file_path, result in zip(task_files, results, strict=False):
+        for _file_path, result in zip(task_files, results, strict=False):
+            # _file_path 用于调试时定位，result 是 (findings, errors)
             file_findings, file_errors = result
             raw_findings.extend(file_findings)
             errors.extend(file_errors)
@@ -175,7 +168,8 @@ class ReviewOrchestrator:
             if critic_dropped > 0:
                 logger.info(
                     "Critic dropped %d/%d findings (dup/low-confidence)",
-                    critic_dropped, len(raw_findings),
+                    critic_dropped,
+                    len(raw_findings),
                 )
         else:
             final_findings = raw_findings
@@ -196,9 +190,7 @@ class ReviewOrchestrator:
     ) -> tuple[list[Finding], list[str]]:
         """带异常隔离的文件审查，返回 (findings, errors)。"""
         try:
-            findings = await self._review_single_file(
-                file_path, hunks, language
-            )
+            findings = await self._review_single_file(file_path, hunks, language)
             return findings, []
         except Exception as e:  # noqa: BLE001
             logger.exception("Failed to review %s", file_path)
@@ -255,7 +247,10 @@ class ReviewOrchestrator:
             if isinstance(result, Exception):
                 logger.warning(
                     "Agent %s failed on %s/%s: %s",
-                    agent_name, file_path, hunk_id, result,
+                    agent_name,
+                    file_path,
+                    hunk_id,
+                    result,
                 )
                 continue
             if isinstance(result, list):
@@ -301,7 +296,9 @@ class ReviewOrchestrator:
             except re.error as e:
                 logger.warning(
                     "Custom rule %s has invalid regex %r: %s",
-                    rule.get("id", "?"), pattern_str, e,
+                    rule.get("id", "?"),
+                    pattern_str,
+                    e,
                 )
                 continue
             compiled.append((regex, rule))
@@ -323,18 +320,20 @@ class ReviewOrchestrator:
 
                 for line_no, line in numbered_lines:
                     if regex.search(line):
-                        findings.append(Finding(
-                            agent="custom",
-                            severity=severity,
-                            category=Category.MAINTAINABILITY,
-                            file_path=file_path,
-                            start_line=line_no,
-                            end_line=line_no,
-                            title=title[:200],
-                            description=message,
-                            evidence=f"L{line_no}: {line.strip()}",
-                            confidence=0.7,
-                        ))
+                        findings.append(
+                            Finding(
+                                agent="custom",
+                                severity=severity,
+                                category=Category.MAINTAINABILITY,
+                                file_path=file_path,
+                                start_line=line_no,
+                                end_line=line_no,
+                                title=title[:200],
+                                description=message,
+                                evidence=f"L{line_no}: {line.strip()}",
+                                confidence=0.7,
+                            )
+                        )
         return findings
 
     def _extract_symbols_from_hunk(
@@ -358,10 +357,14 @@ class ReviewOrchestrator:
         offset = original_start - 1
         fixed: list[SymbolInfo] = []
         for sym in symbols:
-            fixed.append(sym.model_copy(update={
-                "start_line": sym.start_line + offset,
-                "end_line": sym.end_line + offset,
-            }))
+            fixed.append(
+                sym.model_copy(
+                    update={
+                        "start_line": sym.start_line + offset,
+                        "end_line": sym.end_line + offset,
+                    }
+                )
+            )
         return fixed
 
     def _build_stats(
@@ -406,11 +409,7 @@ def _parse_hunk_to_lines(hunk: Hunk) -> list[tuple[int, str]]:
     current_line = hunk.new_start
 
     for line in hunk.content.splitlines():
-        if (
-            line.startswith("@@")
-            or line.startswith("--- ")
-            or line.startswith("+++ ")
-        ):
+        if line.startswith("@@") or line.startswith("--- ") or line.startswith("+++ "):
             continue
         if line.startswith("+"):
             result.append((current_line, line[1:]))

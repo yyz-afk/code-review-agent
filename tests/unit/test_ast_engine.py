@@ -145,26 +145,20 @@ class TestGetChangedSymbols:
     """变更符号识别。"""
 
     def test_returns_only_affected_symbols(self, engine: AstEngine) -> None:
-        symbols = engine.get_changed_symbols(
-            PY_SAMPLE, "python", [7], "test.py"
-        )
+        symbols = engine.get_changed_symbols(PY_SAMPLE, "python", [7], "test.py")
         # L7 属于 func_a（6-8）
         names = [s.name for s in symbols]
         assert "func_a" in names
 
     def test_deduplicates_symbols(self, engine: AstEngine) -> None:
         # 多行变更但同一函数，应该去重
-        symbols = engine.get_changed_symbols(
-            PY_SAMPLE, "python", [7, 8], "test.py"
-        )
+        symbols = engine.get_changed_symbols(PY_SAMPLE, "python", [7, 8], "test.py")
         names = [s.name for s in symbols]
         assert names.count("func_a") == 1
 
     def test_handles_multiple_symbols(self, engine: AstEngine) -> None:
         # 跨多个函数的变更
-        symbols = engine.get_changed_symbols(
-            PY_SAMPLE, "python", [7, 14], "test.py"
-        )
+        symbols = engine.get_changed_symbols(PY_SAMPLE, "python", [7, 14], "test.py")
         names = {s.name for s in symbols}
         # 应该包含两个不同函数
         assert "func_a" in names

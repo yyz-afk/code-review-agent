@@ -39,25 +39,29 @@ console = Console()
 
 
 def _setup_logging(level: str = "INFO") -> None:
-    """配置 rich 日志。"""
+    """配置 rich 日志。
+
+    v0.8.2：日志走 stderr（独立 console），避免污染 stdout 中的 SARIF/JSON 输出。
+    SARIF/JSON 消费方期望 stdout 只有结构化数据，日志必须走 stderr。
+    """
+    err_console = Console(stderr=True)
     logging.basicConfig(
         level=level,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler(
-            console=console,
-            show_time=False,
-            show_path=False,
-            rich_tracebacks=True,
-        )],
+        handlers=[
+            RichHandler(
+                console=err_console,
+                show_time=False,
+                show_path=False,
+                rich_tracebacks=True,
+            )
+        ],
     )
 
 
 def _print_banner() -> None:
-    console.print(
-        f"\n[bold blue]Code Review Agent[/bold blue] "
-        f"[dim]v{__version__}[/dim]\n"
-    )
+    console.print(f"\n[bold blue]Code Review Agent[/bold blue] [dim]v{__version__}[/dim]\n")
 
 
 @app.command()
@@ -70,7 +74,8 @@ def version() -> None:
 def review(
     base: str = typer.Option(
         None,
-        "--base", "-b",
+        "--base",
+        "-b",
         help="Base ref（分支/commit/tag），例如 main 或 HEAD~1",
     ),
     head: str = typer.Option(
@@ -80,7 +85,8 @@ def review(
     ),
     repo: Path = typer.Option(
         Path.cwd(),
-        "--repo", "-r",
+        "--repo",
+        "-r",
         help="Git 仓库路径（默认当前目录）",
         exists=True,
         file_okay=False,
@@ -94,19 +100,22 @@ def review(
     ),
     fmt: str = typer.Option(
         "text",
-        "--format", "-f",
+        "--format",
+        "-f",
         help="输出格式：text / markdown / json / sarif",
     ),
     output: Path = typer.Option(
         None,
-        "--output", "-o",
+        "--output",
+        "-o",
         help="输出到文件（默认 stdout）",
     ),
     confidence: float = typer.Option(
         None,
         "--confidence",
         help="置信度阈值（0.0-1.0，默认从配置读取）",
-        min=0.0, max=1.0,  # v0.8.1：范围校验，typer 自动报错
+        min=0.0,
+        max=1.0,  # v0.8.1：范围校验，typer 自动报错
     ),
     agents: str = typer.Option(
         None,
@@ -114,7 +123,9 @@ def review(
         help="启用的 Agent（逗号分隔：correctness,security,performance,architecture）",
     ),
     quiet: bool = typer.Option(
-        False, "--quiet", "-q",
+        False,
+        "--quiet",
+        "-q",
         help="静默模式（不输出 banner / 统计）",
     ),
 ) -> None:
@@ -125,16 +136,20 @@ def review(
     if not quiet:
         _print_banner()
 
-    # 构建配置
+    # 构建配置（enabled_agents=None 时让 ReviewConfig 用默认值，不显式覆盖）
     enabled_agents: list[str] | None = None
     if agents:
         enabled_agents = [a.strip() for a in agents.split(",") if a.strip()]
 
-    config = ReviewConfig(
-        confidence_threshold=confidence or settings.confidence_threshold,
-        max_findings_per_file=settings.max_findings_per_file,
-        enabled_agents=enabled_agents if enabled_agents else None,
-    )
+    # v0.8.2 修复：显式传 None 会覆盖 dataclass 默认值，导致 orchestrator 报 TypeError。
+    # 改用 dict 展开条件传参。
+    config_kwargs: dict = {
+        "confidence_threshold": confidence or settings.confidence_threshold,
+        "max_findings_per_file": settings.max_findings_per_file,
+    }
+    if enabled_agents is not None:
+        config_kwargs["enabled_agents"] = enabled_agents
+    config = ReviewConfig(**config_kwargs)
 
     # 加载项目级 .cra.toml（命令行参数优先级最高，不被覆盖）
     from cra.core.config_loader import load_project_config  # noqa: PLC0415
@@ -150,9 +165,7 @@ def review(
                 config.confidence_threshold = project_cfg.confidence_threshold
             if project_cfg.max_findings_per_file is not None:
                 config.max_findings_per_file = project_cfg.max_findings_per_file
-        console.print(
-            f"[dim]Loaded project config: {project_cfg.source_path}[/dim]"
-        )
+        console.print(f"[dim]Loaded project config: {project_cfg.source_path}[/dim]")
 
     # v0.8.1：把 project_config 传给 orchestrator 让其生效
     # （excluded_paths / custom_rules 在 orchestrator 中真正使用）
@@ -182,15 +195,17 @@ def review(
     if output:
         save_report(result, output, fmt)
         console.print(f"[green]✓ Report saved to[/green] {output}")
+    elif fmt in ("json", "sarif"):
+        # v0.8.2：结构化格式走原始 print，避免 Rich 自动换行破坏 JSON
+        # （Rich 在窄终端会按宽度 wrap，导致 JSON 解析失败）
+        print(content)
     else:
         console.print(content)
 
     # 退出码：有 critical/high → 1，否则 0
     if result.blockers:
         if not quiet:
-            console.print(
-                f"\n[red]⚠️  {len(result.blockers)} blocker(s) found[/red]"
-            )
+            console.print(f"\n[red]⚠️  {len(result.blockers)} blocker(s) found[/red]")
         raise typer.Exit(1)
 
 
@@ -209,6 +224,7 @@ def info() -> None:
 
     # API Key 状态
     import os
+
     console.print("\n[bold]LLM Providers:[/bold]")
     for name, key in [
         ("DEEPSEEK", "DEEPSEEK_API_KEY"),

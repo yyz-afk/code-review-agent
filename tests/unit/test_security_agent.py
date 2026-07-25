@@ -51,7 +51,7 @@ class TestMockRules:
         assert findings[0].start_line == 5
 
     def test_detects_shell_true(self) -> None:
-        code = 'subprocess.call(cmd, shell=True)'
+        code = "subprocess.call(cmd, shell=True)"
         findings = _run_mock_rules(code, 3, "x.py")
         assert len(findings) == 1
         assert findings[0].severity.value == "critical"
@@ -90,9 +90,9 @@ class TestMockRules:
         assert findings[0].start_line == 100
 
     def test_multiple_violations_in_same_code(self) -> None:
-        code = '''API_KEY = "sk-xxx"
+        code = """API_KEY = "sk-xxx"
 cursor.execute(f"SELECT * WHERE id = {uid}")
-pickle.loads(data)'''
+pickle.loads(data)"""
         findings = _run_mock_rules(code, 1, "multi.py")
         assert len(findings) == 3
 

@@ -67,7 +67,15 @@ select = [
     "UP",   # pyupgrade
     "RUF",  # ruff-specific
 ]
-ignore = ["E501"]  # 行长由 formatter 管
+ignore = [
+    "E501",    # 行长由 formatter 管
+    "RUF001",  # 中文标点与英文标点歧义（项目风格允许中文标点）
+    "RUF002",  # 同上（docstring 内）
+    "RUF003",  # 同上（comment 内）
+    "RUF100",  # 未使用的 noqa（与项目历史兼容）
+    "B008",    # typer/click 的 typer.Option(...) in default 是官方推荐写法
+    "UP042",   # str+Enum → StrEnum：保持向后兼容（StrEnum 在 __str__/pickle 有差异）
+]
 
 [tool.ruff.format]
 quote-style = "double"

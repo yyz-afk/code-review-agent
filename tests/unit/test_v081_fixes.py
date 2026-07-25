@@ -43,7 +43,10 @@ def mock_orchestrator() -> ReviewOrchestrator:
 def _make_hunk(content: str, new_start: int = 1) -> Hunk:
     """便捷构造 Hunk。"""
     return Hunk(
-        old_start=1, old_lines=1, new_start=new_start, new_lines=1,
+        old_start=1,
+        old_lines=1,
+        new_start=new_start,
+        new_lines=1,
         content=content,
     )
 
@@ -93,13 +96,15 @@ class TestExcludedPathsApplied:
         # vendor/ 应被排除，src/ 应保留
         reviewed_files = {f.file_path for f in result.findings}
         # 关键断言：vendor/ 下不应出现
-        assert all("vendor" not in f for f in reviewed_files), \
+        assert all("vendor" not in f for f in reviewed_files), (
             f"vendor/ 文件不应被审查: {reviewed_files}"
+        )
         # src/app.py 应该被审查（即使没有 finding 也要确认被处理过）
         # 注：mock 模式只在某些 pattern 命中时产生 finding，
         # 所以用 stats.files_reviewed 验证更可靠
-        assert result.stats.files_reviewed >= 1, \
+        assert result.stats.files_reviewed >= 1, (
             f"应至少审查 1 个文件（src/app.py），实际: {result.stats.files_reviewed}"
+        )
 
     @pytest.mark.asyncio
     async def test_no_project_config_keeps_existing_behavior(self) -> None:
@@ -111,12 +116,7 @@ class TestExcludedPathsApplied:
             # project_config=None → 默认空 ProjectConfig
         )
 
-        diff_text = (
-            "--- /dev/null\n"
-            "+++ b/src/app.py\n"
-            "@@ -0,0 +1,1 @@\n"
-            "+except Exception:\n"
-        )
+        diff_text = "--- /dev/null\n+++ b/src/app.py\n@@ -0,0 +1,1 @@\n+except Exception:\n"
         result = await orchestrator.review_diff(diff_text)
         # 应该正常审查（不被空 excluded_paths 影响）
         assert result.stats.files_reviewed >= 1
@@ -162,8 +162,7 @@ class TestCustomRulesApplied:
 
         # 应该至少有一个来自 custom agent 的 finding
         custom_findings = [f for f in result.findings if f.agent == "custom"]
-        assert len(custom_findings) >= 1, \
-            f"custom_rules 未生效: findings={result.findings}"
+        assert len(custom_findings) >= 1, f"custom_rules 未生效: findings={result.findings}"
         # 验证 finding 内容
         first = custom_findings[0]
         assert "no-print" in first.title
@@ -188,7 +187,7 @@ class TestCustomRulesApplied:
                 "severity": "info",
                 "pattern": "TODO",
                 "message": "todo found",
-            }
+            },
         ]
 
         orchestrator = ReviewOrchestrator(
@@ -196,18 +195,11 @@ class TestCustomRulesApplied:
             project_config=project_cfg,
         )
 
-        diff_text = (
-            "--- /dev/null\n"
-            "+++ b/app.py\n"
-            "@@ -0,0 +1,1 @@\n"
-            "+# TODO: fix this\n"
-        )
+        diff_text = "--- /dev/null\n+++ b/app.py\n@@ -0,0 +1,1 @@\n+# TODO: fix this\n"
         # 不应该抛异常
         result = await orchestrator.review_diff(diff_text)
         # good 规则应该生效
-        good_findings = [
-            f for f in result.findings if "good" in f.title
-        ]
+        good_findings = [f for f in result.findings if "good" in f.title]
         assert len(good_findings) >= 1
 
     @pytest.mark.asyncio
@@ -220,12 +212,7 @@ class TestCustomRulesApplied:
             project_config=ProjectConfig(),  # custom_rules = []
         )
 
-        diff_text = (
-            "--- /dev/null\n"
-            "+++ b/app.py\n"
-            "@@ -0,0 +1,1 @@\n"
-            "+x = 1\n"
-        )
+        diff_text = "--- /dev/null\n+++ b/app.py\n@@ -0,0 +1,1 @@\n+x = 1\n"
         result = await orchestrator.review_diff(diff_text)
         # 无 custom findings
         assert not any(f.agent == "custom" for f in result.findings)
@@ -234,17 +221,21 @@ class TestCustomRulesApplied:
         self, mock_orchestrator: ReviewOrchestrator
     ) -> None:
         """custom rule 命中的行号应该映射到原始文件行号。"""
-        rules = [{
-            "id": "todo",
-            "severity": "info",
-            "pattern": "TODO",
-            "message": "todo",
-        }]
+        rules = [
+            {
+                "id": "todo",
+                "severity": "info",
+                "pattern": "TODO",
+                "message": "todo",
+            }
+        ]
         # hunk 从 L10 开始，TODO 在第 2 行（即原文件 L11）
-        hunks = [_make_hunk(
-            "@@ -1,1 +10,2 @@\n+line1\n+# TODO: fix\n",
-            new_start=10,
-        )]
+        hunks = [
+            _make_hunk(
+                "@@ -1,1 +10,2 @@\n+line1\n+# TODO: fix\n",
+                new_start=10,
+            )
+        ]
 
         findings = mock_orchestrator._run_custom_rules("app.py", hunks, rules)
         assert len(findings) == 1
@@ -267,31 +258,41 @@ class TestSarifUriNormalization:
             severity=Severity.HIGH,
             category=Category.CORRECTNESS,
             file_path=path,
-            start_line=1, end_line=1,
-            title="test", description="d",
+            start_line=1,
+            end_line=1,
+            title="test",
+            description="d",
             confidence=0.9,
         )
         stats = ReviewStats(duration_sec=0.1, cost_usd=0.001, files_reviewed=1)
         result = ReviewResult(
-            base_ref="main", head_ref="HEAD",
-            findings=[finding], stats=stats,
+            base_ref="main",
+            head_ref="HEAD",
+            findings=[finding],
+            stats=stats,
         )
         return render_sarif(result)
 
     def test_windows_path_normalized(self) -> None:
         sarif = json.loads(self._render_with_path("src\\pkg\\mod.py"))
-        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+            "artifactLocation"
+        ]["uri"]
         assert uri == "src/pkg/mod.py"
         assert "\\" not in uri
 
     def test_unix_path_unchanged(self) -> None:
         sarif = json.loads(self._render_with_path("src/pkg/mod.py"))
-        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+            "artifactLocation"
+        ]["uri"]
         assert uri == "src/pkg/mod.py"
 
     def test_mixed_separators(self) -> None:
         sarif = json.loads(self._render_with_path("src\\pkg/other\\file.py"))
-        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"][
+            "artifactLocation"
+        ]["uri"]
         assert uri == "src/pkg/other/file.py"
 
 
@@ -306,9 +307,7 @@ class TestDeadCodeRemoved:
     def test_dedup_findings_removed(self, mock_orchestrator: ReviewOrchestrator) -> None:
         assert not hasattr(mock_orchestrator, "_dedup_findings")
 
-    def test_filter_by_confidence_removed(
-        self, mock_orchestrator: ReviewOrchestrator
-    ) -> None:
+    def test_filter_by_confidence_removed(self, mock_orchestrator: ReviewOrchestrator) -> None:
         assert not hasattr(mock_orchestrator, "_filter_by_confidence")
 
 
@@ -366,13 +365,19 @@ class TestCliConfidenceValidation:
 
         runner = CliRunner()
         # 0.5 应该通过校验（虽然后续会因为缺 base/diff 报错，但不会是参数错误）
-        result = runner.invoke(app, [
-            "review", "--confidence", "0.5", "--diff", "/nonexistent",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "review",
+                "--confidence",
+                "0.5",
+                "--diff",
+                "/nonexistent",
+            ],
+        )
         # 不是参数校验错误（exit_code 2 是 typer 的参数错误）
         # 这里因为文件不存在会失败，但不应该是 confidence 的错
-        assert "Invalid value" not in result.output or \
-               "confidence" not in result.output
+        assert "Invalid value" not in result.output or "confidence" not in result.output
 
     def test_confidence_out_of_range_rejected(self) -> None:
         """超出范围的值应被拒绝。"""
@@ -381,8 +386,15 @@ class TestCliConfidenceValidation:
         from cra.cli.main import app  # noqa: PLC0415
 
         runner = CliRunner()
-        result = runner.invoke(app, [
-            "review", "--confidence", "5.0", "--diff", "/nonexistent",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "review",
+                "--confidence",
+                "5.0",
+                "--diff",
+                "/nonexistent",
+            ],
+        )
         # typer 应该拒绝（exit_code != 0）
         assert result.exit_code != 0

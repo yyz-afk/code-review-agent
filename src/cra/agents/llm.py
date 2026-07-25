@@ -76,8 +76,7 @@ class LlmCallStats:
 def _has_any_api_key() -> bool:
     """检查是否配置了任一 API Key。"""
     return any(
-        os.environ.get(k)
-        for k in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
+        os.environ.get(k) for k in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY")
     )
 
 
@@ -91,24 +90,24 @@ def _has_any_api_key() -> bool:
 _CUSTOM_MODEL_PRICES: dict[str, dict[str, float]] = {
     # 智谱 GLM 系列（BigModel.cn）
     "glm-5.2": {
-        "input_cost_per_token": 0.00000028,   # ¥0.002/1k → ~$0.28/1M
+        "input_cost_per_token": 0.00000028,  # ¥0.002/1k → ~$0.28/1M
         "output_cost_per_token": 0.00000028,
     },
     "glm-4.7": {
-        "input_cost_per_token": 0.00000007,   # ¥0.5/1M → ~$0.07/1M
+        "input_cost_per_token": 0.00000007,  # ¥0.5/1M → ~$0.07/1M
         "output_cost_per_token": 0.00000007,
     },
     "glm-4-plus": {
-        "input_cost_per_token": 0.00000694,   # ¥50/1M → ~$6.94/1M
+        "input_cost_per_token": 0.00000694,  # ¥50/1M → ~$6.94/1M
         "output_cost_per_token": 0.00000694,
     },
     "glm-4-flash": {
-        "input_cost_per_token": 0.0,           # 免费
+        "input_cost_per_token": 0.0,  # 免费
         "output_cost_per_token": 0.0,
     },
     # DeepSeek
     "deepseek-chat": {
-        "input_cost_per_token": 0.00000014,   # ¥1/1M → ~$0.14/1M
+        "input_cost_per_token": 0.00000014,  # ¥1/1M → ~$0.14/1M
         "output_cost_per_token": 0.00000028,
     },
 }
@@ -165,9 +164,7 @@ class LlmClient:
         if self.mock_mode:
             return self._mock_response(target_model, messages)
 
-        return await self._real_call(
-            target_model, messages, temperature, response_format
-        )
+        return await self._real_call(target_model, messages, temperature, response_format)
 
     async def complete_json(
         self,
@@ -207,8 +204,12 @@ class LlmClient:
             ConnectionError,
         )
         # litellm 的 timeout/api 错误也视为可重试
-        for exc_name in ("litellm.Timeout", "litellm.RateLimitError",
-                         "litellm.APIConnectionError", "httpx.ReadTimeout"):
+        for exc_name in (
+            "litellm.Timeout",
+            "litellm.RateLimitError",
+            "litellm.APIConnectionError",
+            "httpx.ReadTimeout",
+        ):
             try:
                 cls = _resolve_class(exc_name)
                 if cls:
@@ -227,8 +228,12 @@ class LlmClient:
             ):
                 with attempt:
                     return await self._do_single_call(
-                        model, messages, temperature, response_format,
-                        litellm, start,
+                        model,
+                        messages,
+                        temperature,
+                        response_format,
+                        litellm,
+                        start,
                     )
             # 不可达
             raise LlmError("Retry loop exited unexpectedly")
@@ -282,9 +287,7 @@ class LlmClient:
         self.stats.add(result)
         return result
 
-    def _mock_response(
-        self, model: str, messages: list[dict[str, str]]
-    ) -> LlmResponse:
+    def _mock_response(self, model: str, messages: list[dict[str, str]]) -> LlmResponse:
         """Mock 模式：返回空内容（由 Agent 自行处理）。"""
         result = LlmResponse(
             content="[]",  # 默认空 findings
@@ -318,11 +321,15 @@ class LlmClient:
         # 2. 兜底：litellm 内置价格
         try:
             import litellm  # noqa: PLC0415
-            return float(litellm.completion_cost(
-                model=model,
-                prompt=" ",  # litellm 会用 token count 推算
-                completion=" ",
-            ) or 0.0)
+
+            return float(
+                litellm.completion_cost(
+                    model=model,
+                    prompt=" ",  # litellm 会用 token count 推算
+                    completion=" ",
+                )
+                or 0.0
+            )
         except Exception:  # noqa: BLE001
             return 0.0
 

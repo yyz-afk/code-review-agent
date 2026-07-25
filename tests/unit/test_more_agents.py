@@ -70,9 +70,7 @@ def get(x):
 
 class TestPerformanceAgentInterface:
     @pytest.mark.asyncio
-    async def test_review_uses_mock(
-        self, perf_agent: PerformanceAgent
-    ) -> None:
+    async def test_review_uses_mock(self, perf_agent: PerformanceAgent) -> None:
         ctx = AgentContext(
             file_path="test.py",
             file_content='for u in users:\n    cur.execute("SELECT 1")',
@@ -109,9 +107,7 @@ class TestArchitectureMockRules:
 
 class TestArchitectureAgentInterface:
     @pytest.mark.asyncio
-    async def test_review_uses_mock(
-        self, arch_agent: ArchitectureAgent
-    ) -> None:
+    async def test_review_uses_mock(self, arch_agent: ArchitectureAgent) -> None:
         ctx = AgentContext(
             file_path="test.py",
             file_content="def x():\n    pass\n",

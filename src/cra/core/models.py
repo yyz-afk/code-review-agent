@@ -195,10 +195,7 @@ class ReviewResult(BaseModel):
     @property
     def blockers(self) -> list[Finding]:
         """阻断性问题（critical/high）。"""
-        return [
-            f for f in self.findings
-            if f.severity in (Severity.CRITICAL, Severity.HIGH)
-        ]
+        return [f for f in self.findings if f.severity in (Severity.CRITICAL, Severity.HIGH)]
 
 
 # ============================================================

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -60,15 +59,9 @@ class Settings(BaseSettings):
     # 这里不重复声明
 
     # --- 审查策略 ---
-    confidence_threshold: float = Field(
-        default=0.5, validation_alias="CRA_CONFIDENCE_THRESHOLD"
-    )
-    max_findings_per_file: int = Field(
-        default=5, validation_alias="CRA_MAX_FINDINGS_PER_FILE"
-    )
-    max_cost_per_review: float = Field(
-        default=5.0, validation_alias="CRA_MAX_COST_PER_REVIEW"
-    )
+    confidence_threshold: float = Field(default=0.5, validation_alias="CRA_CONFIDENCE_THRESHOLD")
+    max_findings_per_file: int = Field(default=5, validation_alias="CRA_MAX_FINDINGS_PER_FILE")
+    max_cost_per_review: float = Field(default=5.0, validation_alias="CRA_MAX_COST_PER_REVIEW")
 
     # --- 日志 ---
     log_level: str = Field(default="INFO", validation_alias="CRA_LOG_LEVEL")

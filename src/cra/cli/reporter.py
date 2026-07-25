@@ -40,10 +40,11 @@ def render_text(result: ReviewResult, file=None) -> str:
         w(f"  Findings: {len(result.findings)}\n\n")
         sorted_findings = sorted(result.findings, key=lambda f: f.severity.rank)
         for i, f in enumerate(sorted_findings, 1):
-            w(f"  {i}. {f.severity.icon} [{f.severity.value.upper():8s}] "
-              f"[{f.category.value}]\n")
-            w(f"     📍 {f.file_path}:{f.start_line}-{f.end_line} "
-              f"(by {f.agent}, conf={f.confidence:.2f})\n")
+            w(f"  {i}. {f.severity.icon} [{f.severity.value.upper():8s}] [{f.category.value}]\n")
+            w(
+                f"     📍 {f.file_path}:{f.start_line}-{f.end_line} "
+                f"(by {f.agent}, conf={f.confidence:.2f})\n"
+            )
             w(f"     💡 {f.title}\n")
             if f.description:
                 for line in f.description.splitlines()[:3]:

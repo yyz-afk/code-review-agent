@@ -117,16 +117,16 @@ class DiffParser:
                 # 实际 add/delete/modify 状态会从 ---/+++ 推断
                 # rename 信息也会从 ---/+++ 不一致推断
                 if line.startswith("rename from"):
-                    pending_old_path = line[len("rename from "):]
+                    pending_old_path = line[len("rename from ") :]
                 elif line.startswith("rename to"):
-                    pending_new_path = line[len("rename to "):]
+                    pending_new_path = line[len("rename to ") :]
                     try_create_from_header()
                 continue
 
             # 在已经有 current_file 的场景下，遇到 rename 等标记更新
             if current_file is not None:
                 if line.startswith("rename from"):
-                    current_file.old_path = line[len("rename from "):]
+                    current_file.old_path = line[len("rename from ") :]
                 elif line.startswith("rename to"):
                     current_file.status = ChangeStatus.RENAMED
 
@@ -159,17 +159,17 @@ class DiffParser:
         match = self.HUNK_HEADER.match(header)
         if not match:
             return
-        file.hunks.append(Hunk(
-            old_start=int(match.group("old_start")),
-            old_lines=int(match.group("old_lines") or 1),
-            new_start=int(match.group("new_start")),
-            new_lines=int(match.group("new_lines") or 1),
-            content="\n".join(lines),
-        ))
+        file.hunks.append(
+            Hunk(
+                old_start=int(match.group("old_start")),
+                old_lines=int(match.group("old_lines") or 1),
+                new_start=int(match.group("new_start")),
+                new_lines=int(match.group("new_lines") or 1),
+                content="\n".join(lines),
+            )
+        )
 
-    def get_diff_from_git(
-        self, repo_path: Path, base: str, head: str
-    ) -> Diff:
+    def get_diff_from_git(self, repo_path: Path, base: str, head: str) -> Diff:
         """从 Git 仓库获取 diff。"""
         diff_text = self._run_git_diff(repo_path, base, head)
         files = self.parse_unified_diff(diff_text)
@@ -194,7 +194,8 @@ class DiffParser:
         try:
             result = subprocess.run(
                 [
-                    "git", "diff",
+                    "git",
+                    "diff",
                     "--no-color",
                     f"{base}...{head}",
                 ],
@@ -206,9 +207,7 @@ class DiffParser:
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(
-                f"git diff failed: {e.stderr or e.stdout}"
-            ) from e
+            raise RuntimeError(f"git diff failed: {e.stderr or e.stdout}") from e
         except FileNotFoundError as e:
             raise RuntimeError("git command not found") from e
 

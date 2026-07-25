@@ -16,7 +16,7 @@ def engine():
 # JavaScript
 # ============================================================
 
-JS_SAMPLE = '''\
+JS_SAMPLE = """\
 const x = 1;
 
 function greet(name) {
@@ -34,7 +34,7 @@ class Calculator {
 }
 
 const arrow = (x) => x * 2;
-'''
+"""
 
 
 class TestJavaScript:
@@ -45,7 +45,6 @@ class TestJavaScript:
 
     def test_extracts_arrow_function(self, engine) -> None:
         symbols = engine.extract_symbols(JS_SAMPLE, "javascript", "test.js")
-        names = [s.name for s in symbols]
         # arrow function 可能命名也可能不命名，这里验证至少能识别为函数
         funcs = [s for s in symbols if s.type == "function"]
         assert len(funcs) >= 1
@@ -62,7 +61,7 @@ class TestJavaScript:
 # TypeScript
 # ============================================================
 
-TS_SAMPLE = '''\
+TS_SAMPLE = """\
 interface User {
     id: number;
     name: string;
@@ -83,7 +82,7 @@ class UserService {
 function formatUser(u: User): string {
     return `${u.id}: ${u.name}`;
 }
-'''
+"""
 
 
 class TestTypeScript:
@@ -109,7 +108,7 @@ class TestTypeScript:
 # Java
 # ============================================================
 
-JAVA_SAMPLE = '''\
+JAVA_SAMPLE = """\
 public class HelloWorld {
     private String name;
 
@@ -131,7 +130,7 @@ class Utility {
         return a + b;
     }
 }
-'''
+"""
 
 
 class TestJava:
@@ -151,10 +150,7 @@ class TestJava:
     def test_extracts_constructor(self, engine) -> None:
         symbols = engine.extract_symbols(JAVA_SAMPLE, "java", "Main.java")
         # 构造函数被识别为 method，名字为 "HelloWorld.HelloWorld"（带类前缀）
-        ctors = [
-            s for s in symbols
-            if s.type == "method" and s.name.endswith("HelloWorld")
-        ]
+        ctors = [s for s in symbols if s.type == "method" and s.name.endswith("HelloWorld")]
         assert len(ctors) >= 1
 
 
@@ -162,7 +158,7 @@ class TestJava:
 # Go
 # ============================================================
 
-GO_SAMPLE = '''\
+GO_SAMPLE = """\
 package main
 
 import "fmt"
@@ -183,7 +179,7 @@ func (c *Calculator) Add(a, b int) int {
 func main() {
     fmt.Println(greet("world"))
 }
-'''
+"""
 
 
 class TestGo:
@@ -219,7 +215,5 @@ class TestEndToEndLanguageDetection:
             ("readme.md", None),
         ],
     )
-    def test_language_detection(
-        self, engine, file_path: str, expected_lang: str | None
-    ) -> None:
+    def test_language_detection(self, engine, file_path: str, expected_lang: str | None) -> None:
         assert engine.get_language(file_path) == expected_lang

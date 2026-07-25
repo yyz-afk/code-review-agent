@@ -53,21 +53,27 @@ def _load_language_capsule(language: str):
     """加载语言的 grammar capsule。"""
     if language == "python":
         import tree_sitter_python as tspython  # noqa: PLC0415
+
         return tspython.language()
     if language == "javascript":
         import tree_sitter_javascript as tsjs  # noqa: PLC0415
+
         return tsjs.language()
     if language == "typescript":
         import tree_sitter_typescript as tsts  # noqa: PLC0415
+
         return tsts.language_typescript()
     if language == "tsx":
         import tree_sitter_typescript as tsts  # noqa: PLC0415
+
         return tsts.language_tsx()
     if language == "java":
         import tree_sitter_java as tsjava  # noqa: PLC0415
+
         return tsjava.language()
     if language == "go":
         import tree_sitter_go as tsgo  # noqa: PLC0415
+
         return tsgo.language()
     raise ValueError(f"Unsupported language: {language}")
 
@@ -142,14 +148,16 @@ class AstEngine:
             if node.type in class_types:
                 cn = self._extract_name(node, language)
                 if cn:
-                    symbols.append(SymbolInfo(
-                        name=cn,
-                        type="class",
-                        file_path=file_path,
-                        start_line=node.start_point[0] + 1,
-                        end_line=node.end_point[0] + 1,
-                        code=node.text.decode("utf-8", errors="replace"),
-                    ))
+                    symbols.append(
+                        SymbolInfo(
+                            name=cn,
+                            type="class",
+                            file_path=file_path,
+                            start_line=node.start_point[0] + 1,
+                            end_line=node.end_point[0] + 1,
+                            code=node.text.decode("utf-8", errors="replace"),
+                        )
+                    )
                     for child in node.children:
                         walk(child, cn)
                 return
@@ -159,14 +167,16 @@ class AstEngine:
                 fname = self._extract_name(node, language)
                 if fname:
                     full_name = f"{class_name}.{fname}" if class_name else fname
-                    symbols.append(SymbolInfo(
-                        name=full_name,
-                        type="method" if class_name else "function",
-                        file_path=file_path,
-                        start_line=node.start_point[0] + 1,
-                        end_line=node.end_point[0] + 1,
-                        code=node.text.decode("utf-8", errors="replace"),
-                    ))
+                    symbols.append(
+                        SymbolInfo(
+                            name=full_name,
+                            type="method" if class_name else "function",
+                            file_path=file_path,
+                            start_line=node.start_point[0] + 1,
+                            end_line=node.end_point[0] + 1,
+                            code=node.text.decode("utf-8", errors="replace"),
+                        )
+                    )
                 # 嵌套函数也递归
                 for child in node.children:
                     walk(child, class_name)
@@ -200,14 +210,12 @@ class AstEngine:
 
         return None
 
-    def find_symbol_at_line(
-        self, symbols: list[SymbolInfo], line: int
-    ) -> SymbolInfo | None:
+    def find_symbol_at_line(self, symbols: list[SymbolInfo], line: int) -> SymbolInfo | None:
         """根据行号反查所属符号。"""
         candidates = [
-            s for s in symbols
-            if s.type in ("function", "method")
-            and s.start_line <= line <= s.end_line
+            s
+            for s in symbols
+            if s.type in ("function", "method") and s.start_line <= line <= s.end_line
         ]
         if not candidates:
             return None

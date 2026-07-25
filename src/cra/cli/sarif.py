@@ -63,9 +63,7 @@ def _build_sarif(result: ReviewResult) -> dict:
             rules[rule_id] = {
                 "id": rule_id,
                 "name": _category_to_rule_short_name(finding.category).upper(),
-                "shortDescription": {
-                    "text": f"Code Review Agent: {finding.category.value}"
-                },
+                "shortDescription": {"text": f"Code Review Agent: {finding.category.value}"},
                 "fullDescription": {
                     "text": (
                         f"Issues reported by the {finding.agent} agent "
