@@ -181,7 +181,7 @@ jobs:
 | GitHub Enterprise | ✅ 需要 GHAS 许可 |
 | GitHub Free（私有仓库） | ⚠️ 不支持上传，但可保存为 artifact |
 
-如果用不上 Code Scanning，可以关闭上传并使用 artifact 下载：
+如果用不上 Code Scanning(代码扫描)，可以关闭上传并使用 artifact 下载：
 
 ```yaml
 - uses: xuxiaxuan/code-review-agent@main

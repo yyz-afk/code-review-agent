@@ -1,7 +1,7 @@
 name: AI Code Review
 on:
   pull_request:
-    branches: [main]
+    branches: [main, dev]
 permissions:
   contents: read
   security-events: write
