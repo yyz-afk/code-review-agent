@@ -12,7 +12,7 @@ jobs:
       - uses: yyz-afk/code-review-agent@main
         with:
           api_key: ${{ secrets.CRA_API_KEY }}          #${{ secrets.CRA_API_KEY }}
-          model: "deepseek/deepseek-v4-pro"           # 模型名（见第 5 节）
+          model: "deepseek/deepseek-flash"           # 模型名（见第 5 节）
           api_base: ""                              # 自定义 API Base（兼容接口用）
           base: ""                                  # 留空则自动用 PR base
           head: "HEAD"                              # 默认 HEAD
